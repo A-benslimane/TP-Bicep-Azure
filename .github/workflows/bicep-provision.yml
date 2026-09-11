@@ -1,0 +1,102 @@
+name: Bicep Provision
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install Bicep
+        run: az bicep install
+
+      - name: Generate temporary SSH key
+        run: |
+          ssh-keygen -t ed25519 -N "" -f "$RUNNER_TEMP/tp_bicep_key" -q
+          echo "SSH_PUBLIC_KEY=$(cat $RUNNER_TEMP/tp_bicep_key.pub)" >> "$GITHUB_ENV"
+
+      - name: Get GitHub runner public IP
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "RUNNER_IP=${RUNNER_IP}/32" >> "$GITHUB_ENV"
+
+      - name: Create resource groups
+        run: |
+          az group create \
+            --name rg-abdel-tp104-ex1 \
+            --location francecentral
+
+          az group create \
+            --name rg-abdel-tp104-ex2 \
+            --location francecentral
+
+          az group create \
+            --name rg-abdel-tp104-ex3 \
+            --location westeurope
+
+          az group create \
+            --name rg-abdel-tp104-ex4 \
+            --location westeurope
+
+      - name: Deploy Exercise 1 - VM
+        run: |
+          az deployment group create \
+            --resource-group rg-abdel-tp104-ex1 \
+            --template-file ex1-vm/main.bicep \
+            --parameters \
+              prefix=abdel \
+              adminUsername=abdel \
+              sshPublicKey="$SSH_PUBLIC_KEY" \
+              sourceIp="$RUNNER_IP" \
+              vmSize=Standard_D2s_v3
+
+      - name: Deploy Exercise 2 - VMSS
+        run: |
+          az deployment group create \
+            --resource-group rg-abdel-tp104-ex2 \
+            --template-file ex2-vmss/main.bicep \
+            --parameters \
+              location=westeurope \
+              prefix=abdel \
+              adminUsername=abdel \
+              sshPublicKey="$SSH_PUBLIC_KEY" \
+              vmSize=Standard_D2s_v3 \
+              minInstances=2 \
+              maxInstances=4
+
+      - name: Deploy Exercise 3 - App Service
+        run: |
+          az deployment group create \
+            --resource-group rg-abdel-tp104-ex3 \
+            --template-file ex3-appservice/main.bicep \
+            --parameters \
+              prefix=abdel \
+              location=westeurope
+
+      - name: Deploy Exercise 4 - ACI
+        run: |
+          az deployment group create \
+            --resource-group rg-abdel-tp104-ex4 \
+            --template-file ex4-aci/main.bicep \
+            --parameters \
+              prefix=abdel \
+              location=westeurope \
+              mainCpu=1 \
+              mainMemory=1 \
+              sidecarCpu=1 \
+              sidecarMemory=1
