@@ -25,11 +25,6 @@ jobs:
       - name: Install Bicep
         run: az bicep install
 
-      - name: Generate temporary SSH key
-        run: |
-          ssh-keygen -t ed25519 -N "" -f "$RUNNER_TEMP/tp_bicep_key" -q
-          echo "SSH_PUBLIC_KEY=$(cat $RUNNER_TEMP/tp_bicep_key.pub)" >> "$GITHUB_ENV"
-
       - name: Get GitHub runner public IP
         run: |
           RUNNER_IP=$(curl -s https://api.ipify.org)
@@ -61,7 +56,7 @@ jobs:
             --parameters \
               prefix=abdel \
               adminUsername=abdel \
-              sshPublicKey="$SSH_PUBLIC_KEY" \
+              sshPublicKey="${{ vars.SSH_PUBLIC_KEY }}" \
               sourceIp="$RUNNER_IP" \
               vmSize=Standard_D2s_v3
 
@@ -74,7 +69,7 @@ jobs:
               location=westeurope \
               prefix=abdel \
               adminUsername=abdel \
-              sshPublicKey="$SSH_PUBLIC_KEY" \
+              sshPublicKey="${{ vars.SSH_PUBLIC_KEY }}" \
               vmSize=Standard_D2s_v3 \
               minInstances=2 \
               maxInstances=4
